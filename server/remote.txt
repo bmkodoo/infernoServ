@@ -1,0 +1,21 @@
+Note: One important point to note in the following examples is that the -A switch used in both the listen and mount commands disables authentication. All the data is being sent unencrypted and no login information was used to connect. Don't do this for real systems, I'm only doing this to show the basic commands. It's possible and recommended to set up authentication and encryption for real world usage. Once done this can replace the use of sftp on Inferno systems. Just export and bind the filesystems needed and all access is authenticated and all data encrypted.
+
+To access a resource on another machine (or another instance of hosted Inferno OS on the same machine) you can run the listen command on the remote machine, exporting the namespace you want the client machine to be able to bind:
+
+$ emu
+; ndb/cs
+; ndb/dns
+; listen -A 'tcp!*!8000' { export '#U*/home/myuser' & }
+;
+The ndb/cs and ndb/dns commands start the network services used for DNS lookup and other features. the listen command starts a listener on port 8000 exporting the myuser home directory from the host filesystem. I picked 8000 as an arbitary port number - any one is fine. A client machine can now connect to this using:
+
+$ emu
+; ndb/cs
+; ndb/dns
+; mkdir /tmp/myuser
+; mount -A 'tcp!remote.example.com!8000' /tmp/myuser
+; cd /tmp/myuser
+; ls
+...remote file listing...
+; unmount /tmp/myuser
+Replace 'remote.example.com' with the IP address or domain name of the remote machine. The mounted directory works like a local directory from the point of view of the client. You can get directory listings, copy files, edit files, etc.

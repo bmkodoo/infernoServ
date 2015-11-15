@@ -1,0 +1,5 @@
+bind '#Ud:' ./
+limbo simplehttpd.b
+
+ include "dial.m";
+     dial := load Dial Dial->PATH;
