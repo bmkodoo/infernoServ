@@ -56,11 +56,16 @@ init(nil: ref Draw->Context, argv: list of string) {
 		0 =>
 			sendFile(conn, filename);		
 		1 =>
-			sys->print("GET)\n");
+			getFile(conn, filename);
 		2 =>
-			sys->print("LIST)\n");
+			askList(conn);
 	}	
 	
+	rdfd 	:= sys->open(conn.dir + "/data", Sys->OREAD);
+	
+	answer := array [sys->ATOMICIO] of byte;	
+	n = sys->read(rdfd, answer, len answer);
+	sys->print("from Server: %s\n", string answer[:n]);
 	
 }
 
@@ -89,6 +94,61 @@ sendFile(conn : Connection, filename : string) {
 	
 	sys->write(wdfd, data, len data);
 	
+}
+
+askList(conn : Connection) {
+	
+	magSize := 1 + 1 + len "FINALE.";
+	
+	data := array [magSize] of byte;
+	data[0] = byte int 2;
+	data[1] = byte 0;
+	data[2:] = array of byte "FINALE.";
+	
+	wdfd := sys->open(conn.dir + "/data", Sys->OWRITE);
+	
+	sys->write(wdfd, data, len data);
+	
+}
+
+getFile(conn : Connection, filename : string) {
+
+	fileNameBytes := array of byte filename;
+	fileNameSize := len fileNameBytes;
+	
+	
+	rdfd := sys->open("./" + filename, Sys->OREAD);
+	buf := array [sys->ATOMICIO] of byte;
+	n := sys->read(rdfd, buf, len buf);
+	#->print("File: %s\n", string buf[:n]);
+	
+	magSize := 1 + 1 + fileNameSize + n + len "FINALE.";
+	
+	data := array [magSize] of byte;
+	data[0] = byte int 1;
+	data[1] = byte fileNameSize;
+	data[2:] = fileNameBytes;
+	
+	wdfd := sys->open(conn.dir + "/data", Sys->OWRITE);
+	
+	sys->write(wdfd, data, len data);
+	
+	#ANSWER
+	
+	rdfd = sys->open(conn.dir + "/data", Sys->OREAD);
+	
+	answer := array [sys->ATOMICIO] of byte;	
+	n = sys->read(rdfd, answer, len answer);
+	
+	sys->print(": %s\n", string answer[:n]);
+	
+	sys->print("Creating file...\n");
+	if ((fd := sys->create("./" + filename, sys->ORDWR, 8r600)) == nil) {
+		sys->print("FAILED: %r\n");
+	}
+	else {		
+		sys->write(fd, answer, n);		
+	}
 }
 
 

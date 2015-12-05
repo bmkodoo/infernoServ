@@ -71,22 +71,25 @@ hdlrthread(conn : Connection) {
 	
 		comand := int buf[0];
 		sys->print("Command = %d (", comand);
+		answer := "ANS";
 		case  comand {
 			0 =>
-				putFile(buf, n, conn);
+				answer = putFile(buf, n, conn);
 			1 =>
-				sys->print("GET)\n");
+				answer = getFile(buf, n, conn);
 			2 =>
-				sys->print("LIST)\n");
+				answer = getList(buf , n, conn);
 		}	
 	
+		sys->write(wdfd, array of byte answer, len answer);
 		return;
 	}
 }
 
-putFile(buf : array of byte, n : int, conn : Connection) {
+putFile(buf : array of byte, n : int, conn : Connection) : string {
 		
 	sys->print("PUT)\n");
+	answer := "OK";
 	
 	fileNmaeSize := int buf[1];
 	sys->print("Filename size: %d\n", fileNmaeSize);
@@ -111,25 +114,73 @@ putFile(buf : array of byte, n : int, conn : Connection) {
 	sys->print("Creating file...\n");
 	if ((fd := sys->create("./files/" + fileName, sys->ORDWR, 8r600)) == nil) {
 		sys->print("FAILED: %r\n");
+		answer = "FAILED";
 	}
 	else {		
 		sys->write(fd, file, fileSize);		
-		sys->print("OK\nChanging list...\n");
-		<-mutex2Writing;
+		sys->print("OK\n	Changing list...\n");
+		<-mutex2ListAccess;
 		###################################################################
-		files = fileName::files;
-		sys->print("Files: ");
+		if (findInList(files, fileName) == 0) 
+			files = fileName::files;
+		
+		sys->print("	Files: ");
 		printList(files);
 		sys->print("\n");
 		###################################################################
-		mutex2Writing <- = int 1;
-		sys->print("Done.\n");
+		mutex2ListAccess <- = int 1;
+		sys->print("	Done.\n");
 	}
 			
 	###################################################################
 	sys->print("Gritical section leaving...\n");
 	mutex2Writing <- = int 1;
 	sys->print("Left.\n");
+	
+	return answer;
+}
+
+getFile(buf : array of byte, n : int, conn : Connection) : string {
+		
+	sys->print("GET)\n");
+	answer := "OK";
+	
+	fileNmaeSize := int buf[1];
+	sys->print("Filename size: %d\n", fileNmaeSize);
+	fileName := string buf[2:(fileNmaeSize + 2)];
+	sys->print("Filename: %s\n", fileName);
+	
+		
+	sys->print("Checking files list...\n");
+	if (findInList(files, fileName) == 0) {
+		answer = "No such a file!";
+		return answer;
+	}
+	
+	sys->print("Sending file...\n");
+	
+	rdfd := sys->open("./files/" + fileName, Sys->OREAD);
+	file := array [sys->ATOMICIO] of byte;
+	n = sys->read(rdfd, file, len file);
+	answer = string file[:n];
+	
+	sys->print("File: %s\n", answer);
+	
+	return answer;
+}
+
+getList(buf : array of byte, n : int, conn : Connection) : string {
+	sys->print("LIST)\n");
+	
+	return "list of files:\n" + listToString(files);
+}
+
+listToString(listIn : list of string) : string {
+	
+	if (len listIn == 0)
+		return "#";
+
+	return hd listIn + "\n" + listToString(tl listIn);
 }
 
 delFromList(inList : list of string, fileName : string) : list of string {
